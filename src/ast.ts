@@ -7,6 +7,8 @@ export type ConstraintDirective = {
   exclusiveMin?: number;
   // The allowed length of the string must be less than this value.
   exclusiveMax?: number;
+  // Regex pattern that the string must match.
+  pattern?: string;
 };
 
 type ConstraintResultFailure = {
@@ -49,7 +51,7 @@ export type Ref = {
 
 export type BinOp = {
   _: "op";
-  op: "<" | ">" | "<=" | ">=" | "=" | "AND" | "OR";
+  op: "<" | ">" | "<=" | ">=" | "=" | "AND" | "OR" | "~*";
   left: SNode;
   right: SNode;
 };
@@ -84,11 +86,20 @@ export const toSNode = (node: any): SNode => {
         _: "int",
         value: node.A_Const.ival.ival,
       };
+    } else if (node.A_Const.hasOwnProperty("sval")) {
+      return {
+        _: "str",
+        value: node.A_Const.sval.sval,
+      };
     } else {
       throw new Error(
         "Unsupported constant type " + JSON.stringify(node.A_Const)
       );
     }
+  } else if (node.hasOwnProperty("TypeCast")) {
+    const expr = node.TypeCast;
+    // Do we need to do anything here?
+    return toSNode(expr.arg);
   } else if (node.hasOwnProperty("A_Expr")) {
     const expr = node.A_Expr;
     if (expr.kind === "AEXPR_OP") {
@@ -101,6 +112,24 @@ export const toSNode = (node: any): SNode => {
     } else {
       throw new Error("Unsupported A_Expr kind " + expr.kind);
     }
+  } else if (node.hasOwnProperty("BoolExpr")) {
+    const expr = node.BoolExpr;
+    const mapop = (op: string) => {
+      switch (op) {
+        case "AND_EXPR":
+          return "AND";
+        case "OR_EXPR":
+          return "OR";
+        default:
+          throw new Error("Unsupported BoolExpr op " + op);
+      }
+    };
+    return {
+      _: "op",
+      op: mapop(expr.boolop),
+      left: toSNode(expr.args[0]),
+      right: toSNode(expr.args[1]),
+    };
   } else if (node.hasOwnProperty("FuncCall")) {
     const func = node.FuncCall;
     return {

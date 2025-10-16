@@ -85,6 +85,22 @@ export const extractConstraintsFromAST = (
       }
     }
 
+    // Transform regex match expressions.
+    if (
+      n._ === "op" &&
+      n.op === "~*" &&
+      n.left._ === "ref" &&
+      n.left.name === columnName &&
+      n.right._ === "str"
+    ) {
+      return {
+        _: "constraint",
+        constraints: {
+          pattern: n.right.value,
+        },
+      };
+    }
+
     return n;
   };
 

@@ -81,6 +81,28 @@ describe("constraints", () => {
       },
     }));
 
+  // (email)::text ~* '^.+@.+..+$'::text
+  const emailPattern: BinOp = {
+    _: "op",
+    op: "~*",
+    left: {
+      _: "ref",
+      name: "email",
+    },
+    right: {
+      _: "str",
+      value: "^.+@.+..+$",
+    },
+  };
+
+  it("should extract pattern constraints from a regex expression", () =>
+    expect(extractConstraintsFromAST(emailPattern, "email")).toEqual({
+      success: true,
+      constraints: {
+        pattern: "^.+@.+..+$",
+      },
+    }));
+
   const lenGreaterThan10: BinOp = {
     _: "op",
     op: ">",
