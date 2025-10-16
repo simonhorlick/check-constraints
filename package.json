@@ -1,0 +1,22 @@
+{
+  "name": "check-constraints",
+  "version": "1.0.0",
+  "description": "",
+  "license": "MIT",
+  "author": "Simon Horlick <simonhorlick@gmail.com>",
+  "main": "index.js",
+  "scripts": {
+    "compile": "tsc",
+    "prestart": "npm run compile",
+    "test": "vitest",
+    "start": "node ./dist/src/index.js"
+  },
+  "dependencies": {
+    "pgsql-parser": "^17.8.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.6.2",
+    "typescript": "5.9.3",
+    "vitest": "^3.2.4"
+  }
+}
