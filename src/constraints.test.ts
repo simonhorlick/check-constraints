@@ -2,17 +2,6 @@ import { describe, expect, it } from "vitest";
 import { BinOp, SNode } from "./ast";
 import { extractConstraintsFromAST } from "./constraints";
 
-// len(a) < 100 => exclusiveMax: 100 (we can turn this inequality into an exclusiveMax)
-// len(a) > 10 => exclusiveMin: 10
-// 100 < len(a) => exclusiveMin: 100
-// (len(a) > 2) AND (len(a) > 3) => exclusiveMin: 3
-// (len(a) > 10) AND (len(a) < 2) => exclusiveMin: 10, exclusiveMax: 2 (bizarre case)
-// 1 < 2 => true
-// 2 < 1 => false
-// len(a) > 10 AND false => false
-// len(a) > 10 AND true => exclusiveMin: 10 (we can ignore an "AND true")
-// len("a") > 0 => true (we only care about constraints on the given column)
-
 describe("constraints", () => {
   // length(bio) < 10000
   const lenLessThanConst: BinOp = {
