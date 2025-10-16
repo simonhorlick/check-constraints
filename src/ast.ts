@@ -57,6 +57,11 @@ export type ConstraintDirective = {
    * constraint.
    */
   equals?: number;
+
+  /**
+   * A value is valid if it is equal to one of the values in this array.
+   */
+  oneOf?: string[];
 };
 
 type ConstraintResultFailure = {
@@ -92,6 +97,11 @@ export type BoolConst = {
   value: boolean;
 };
 
+export type Arr = {
+  _: "arr";
+  elements: SNode[];
+};
+
 export type Ref = {
   _: "ref";
   name: string; // name of the column
@@ -123,7 +133,8 @@ export type SNode =
   | BinOp
   | Func
   | Ref
-  | ConstraintExpr;
+  | ConstraintExpr
+  | Arr;
 
 // toSNode converts a postgres AST node into a simplified tree structure that
 // is easier for us to work with.
@@ -132,7 +143,7 @@ export const toSNode = (node: any): SNode => {
     if (node.A_Const.hasOwnProperty("ival")) {
       return {
         _: "int",
-        value: node.A_Const.ival.ival,
+        value: node.A_Const.ival.ival ?? 0, // zero if missing
       };
     } else if (node.A_Const.hasOwnProperty("sval")) {
       return {
@@ -156,6 +167,18 @@ export const toSNode = (node: any): SNode => {
         op: expr.name[0].String.sval,
         left: toSNode(expr.lexpr),
         right: toSNode(expr.rexpr),
+      };
+    } else if (expr.kind === "AEXPR_OP_ANY") {
+      // This expression is of the form `foo = ANY (...)`.
+      return {
+        _: "op",
+        op: expr.name[0].String.sval,
+        left: toSNode(expr.lexpr),
+        right: {
+          _: "func",
+          name: "ANY",
+          args: [toSNode(expr.rexpr)],
+        },
       };
     } else {
       throw new Error("Unsupported A_Expr kind " + expr.kind);
@@ -189,6 +212,12 @@ export const toSNode = (node: any): SNode => {
     return {
       _: "ref",
       name: node.ColumnRef.fields[0].String.sval,
+    };
+  } else if (node.hasOwnProperty("A_ArrayExpr")) {
+    const arr = node.A_ArrayExpr;
+    return {
+      _: "arr",
+      elements: arr.elements.map(toSNode),
     };
   } else {
     throw new Error("Unsupported node type: " + JSON.stringify(node));

@@ -296,4 +296,189 @@ describe("ast", () => {
       },
     });
   });
+
+  it("should construct a simplified AST for CHECK ((VALUE >= 0))", () => {
+    const ast = {
+      A_Expr: {
+        kind: "AEXPR_OP",
+        name: [
+          {
+            String: {
+              sval: ">=",
+            },
+          },
+        ],
+        lexpr: {
+          ColumnRef: {
+            fields: [
+              {
+                String: {
+                  sval: "value",
+                },
+              },
+            ],
+          },
+        },
+        rexpr: {
+          A_Const: {
+            ival: {},
+          },
+        },
+      },
+    };
+
+    expect(toSNode(ast)).toEqual({
+      _: "op",
+      op: ">=",
+      left: {
+        _: "ref",
+        name: "value",
+      },
+      right: {
+        _: "int",
+        value: 0,
+      },
+    });
+  });
+
+  it("should construct a simplified AST for CHECK (((VALUE)::text = ANY ((ARRAY['YES'::character varying, 'NO'::character varying])::text[])))", () => {
+    const ast = {
+      A_Expr: {
+        kind: "AEXPR_OP_ANY",
+        name: [
+          {
+            String: {
+              sval: "=",
+            },
+          },
+        ],
+        lexpr: {
+          TypeCast: {
+            arg: {
+              ColumnRef: {
+                fields: [
+                  {
+                    String: {
+                      sval: "value",
+                    },
+                  },
+                ],
+              },
+            },
+            typeName: {
+              names: [
+                {
+                  String: {
+                    sval: "text",
+                  },
+                },
+              ],
+              typemod: -1,
+            },
+          },
+        },
+        rexpr: {
+          TypeCast: {
+            arg: {
+              A_ArrayExpr: {
+                elements: [
+                  {
+                    TypeCast: {
+                      arg: {
+                        A_Const: {
+                          sval: {
+                            sval: "YES",
+                          },
+                        },
+                      },
+                      typeName: {
+                        names: [
+                          {
+                            String: {
+                              sval: "pg_catalog",
+                            },
+                          },
+                          {
+                            String: {
+                              sval: "varchar",
+                            },
+                          },
+                        ],
+                        typemod: -1,
+                      },
+                    },
+                  },
+                  {
+                    TypeCast: {
+                      arg: {
+                        A_Const: {
+                          sval: {
+                            sval: "NO",
+                          },
+                        },
+                      },
+                      typeName: {
+                        names: [
+                          {
+                            String: {
+                              sval: "pg_catalog",
+                            },
+                          },
+                          {
+                            String: {
+                              sval: "varchar",
+                            },
+                          },
+                        ],
+                        typemod: -1,
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+            typeName: {
+              names: [
+                {
+                  String: {
+                    sval: "text",
+                  },
+                },
+              ],
+              typemod: -1,
+              arrayBounds: [
+                {
+                  Integer: {
+                    ival: -1,
+                  },
+                },
+              ],
+            },
+          },
+        },
+      },
+    };
+
+    expect(toSNode(ast)).toEqual({
+      _: "op",
+      op: "=",
+      left: {
+        _: "ref",
+        name: "value",
+      },
+      right: {
+        _: "func",
+        name: "ANY",
+        args: [
+          {
+            _: "arr",
+            elements: [
+              { _: "str", value: "YES" },
+              { _: "str", value: "NO" },
+            ],
+          },
+        ],
+      },
+    });
+  });
 });

@@ -292,4 +292,35 @@ describe("constraints", () => {
       },
     });
   });
+
+  it("should extract constraints: value = ANY (ARRAY['YES', 'NO'])", () => {
+    const expr: SNode = {
+      _: "op",
+      op: "=",
+      left: {
+        _: "ref",
+        name: "value",
+      },
+      right: {
+        _: "func",
+        name: "ANY",
+        args: [
+          {
+            _: "arr",
+            elements: [
+              { _: "str", value: "YES" },
+              { _: "str", value: "NO" },
+            ],
+          },
+        ],
+      },
+    };
+
+    expect(extractConstraintsFromAST(expr, "value")).toEqual({
+      success: true,
+      constraints: {
+        oneOf: ["YES", "NO"],
+      },
+    });
+  });
 });

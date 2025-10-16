@@ -221,6 +221,26 @@ export const extractConstraintsFromAST = (
       }
     }
 
+    // Transform oneOf constraints (e.g. status = ANY (ARRAY['A', 'B', 'C']))
+    if (
+      n._ === "op" &&
+      n.op === "=" &&
+      n.left._ === "ref" &&
+      n.left.name === columnName &&
+      n.right._ === "func" &&
+      n.right.name === "ANY" &&
+      n.right.args.length === 1 &&
+      n.right.args[0]._ === "arr" &&
+      n.right.args[0].elements.every((el) => el._ === "str")
+    ) {
+      return {
+        _: "constraint",
+        constraints: {
+          oneOf: n.right.args[0].elements.map((el) => el.value),
+        },
+      };
+    }
+
     return n;
   };
 
@@ -245,6 +265,9 @@ export const extractConstraintsFromAST = (
       case "func":
         const args = node.args.map(go);
         return visit({ _: "func", name: node.name, args: args });
+      case "arr":
+        const elements = node.elements.map(go);
+        return visit({ _: "arr", elements: elements });
     }
   };
   const result = go(node);
