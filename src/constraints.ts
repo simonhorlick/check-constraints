@@ -1,4 +1,18 @@
-import { ConstraintResult, SNode } from "./ast";
+import { ConstraintDirective, ConstraintResult, SNode } from "./ast";
+
+const MaxOrUndefined = (a: number | undefined, b: number | undefined) => {
+  if (a === undefined) return b;
+  if (b === undefined) return a;
+  if (a === undefined && b === undefined) return undefined;
+  return Math.max(a, b);
+};
+
+const MinOrUndefined = (a: number | undefined, b: number | undefined) => {
+  if (a === undefined) return b;
+  if (b === undefined) return a;
+  if (a === undefined && b === undefined) return undefined;
+  return Math.min(a, b);
+};
 
 export const extractConstraintsFromAST = (
   node: SNode,
@@ -13,6 +27,17 @@ export const extractConstraintsFromAST = (
   // our way up the tree, simplifying as we go.
 
   const visit = (n: SNode): SNode => {
+    // Transform length(ref) into a length node.
+    // FIXME: why do we do this here and in simplify?
+    if (
+      n._ === "func" &&
+      n.name === "length" &&
+      n.args.length === 1 &&
+      n.args[0]._ === "ref"
+    ) {
+      return { _: "len", arg: n.args[0].name };
+    }
+
     // Transform length op int.
     // FIXME: this assumes len is on the left. Perhaps transform the tree so
     // we can assume that?
@@ -26,7 +51,7 @@ export const extractConstraintsFromAST = (
         case "<":
           return {
             _: "constraint",
-            constraints: { exclusiveMax: n.right.value },
+            constraints: { maxLength: n.right.value - 1 },
           };
         case "<=":
           return {
@@ -36,7 +61,7 @@ export const extractConstraintsFromAST = (
         case ">":
           return {
             _: "constraint",
-            constraints: { exclusiveMin: n.right.value },
+            constraints: { minLength: n.right.value + 1 },
           };
         case ">=":
           return {
@@ -61,26 +86,64 @@ export const extractConstraintsFromAST = (
       const l = visit(n.left);
       const r = visit(n.right);
       if (l._ === "constraint" && r._ === "constraint") {
+        let constraints: ConstraintDirective = {};
+        if (
+          l.constraints.minLength !== undefined ||
+          r.constraints.minLength !== undefined
+        ) {
+          constraints.minLength = MaxOrUndefined(
+            l.constraints.minLength,
+            r.constraints.minLength
+          );
+        }
+        if (
+          l.constraints.maxLength !== undefined ||
+          r.constraints.maxLength !== undefined
+        ) {
+          constraints.maxLength = MinOrUndefined(
+            l.constraints.maxLength,
+            r.constraints.maxLength
+          );
+        }
+        if (
+          l.constraints.min !== undefined ||
+          r.constraints.min !== undefined
+        ) {
+          constraints.min = MaxOrUndefined(
+            l.constraints.min,
+            r.constraints.min
+          );
+        }
+        if (
+          l.constraints.max !== undefined ||
+          r.constraints.max !== undefined
+        ) {
+          constraints.max = MinOrUndefined(
+            l.constraints.max,
+            r.constraints.max
+          );
+        }
+        if (
+          l.constraints.exclusiveMin !== undefined ||
+          r.constraints.exclusiveMin !== undefined
+        ) {
+          constraints.exclusiveMin = MaxOrUndefined(
+            l.constraints.exclusiveMin,
+            r.constraints.exclusiveMin
+          );
+        }
+        if (
+          l.constraints.exclusiveMax !== undefined ||
+          r.constraints.exclusiveMax !== undefined
+        ) {
+          constraints.exclusiveMax = MinOrUndefined(
+            l.constraints.exclusiveMax,
+            r.constraints.exclusiveMax
+          );
+        }
         return {
           _: "constraint",
-          constraints: {
-            minLength: MaxOrUndefined(
-              l.constraints.minLength,
-              r.constraints.minLength
-            ),
-            maxLength: MinOrUndefined(
-              l.constraints.maxLength,
-              r.constraints.maxLength
-            ),
-            exclusiveMin: MaxOrUndefined(
-              l.constraints.exclusiveMin,
-              r.constraints.exclusiveMin
-            ),
-            exclusiveMax: MinOrUndefined(
-              l.constraints.exclusiveMax,
-              r.constraints.exclusiveMax
-            ),
-          },
+          constraints: constraints,
         };
       }
     }
@@ -101,21 +164,64 @@ export const extractConstraintsFromAST = (
       };
     }
 
+    // Transform non-empty string checks (col <> '') into minLength: 1
+    if (
+      n._ === "op" &&
+      n.op === "<>" &&
+      n.left._ === "ref" &&
+      n.left.name === columnName &&
+      n.right._ === "str" &&
+      n.right.value === ""
+    ) {
+      return {
+        _: "constraint",
+        constraints: {
+          minLength: 1,
+        },
+      };
+    }
+
+    // Transform value constraints (e.g. age > 3)
+    if (
+      n._ === "op" &&
+      n.left._ === "ref" &&
+      n.left.name === columnName &&
+      n.right._ === "int"
+    ) {
+      switch (n.op) {
+        case "<":
+          return {
+            _: "constraint",
+            constraints: { exclusiveMax: n.right.value },
+          };
+        case "<=":
+          return {
+            _: "constraint",
+            constraints: { max: n.right.value },
+          };
+        case ">":
+          return {
+            _: "constraint",
+            constraints: { exclusiveMin: n.right.value },
+          };
+        case ">=":
+          return {
+            _: "constraint",
+            constraints: { min: n.right.value },
+          };
+        case "=":
+          return {
+            _: "constraint",
+            constraints: {
+              equals: n.right.value,
+            },
+          };
+        default:
+          throw new Error(`Unsupported operation: ${n.op}`);
+      }
+    }
+
     return n;
-  };
-
-  const MaxOrUndefined = (a: number | undefined, b: number | undefined) => {
-    if (a === undefined) return b;
-    if (b === undefined) return a;
-    if (a === undefined && b === undefined) return undefined;
-    return Math.max(a, b);
-  };
-
-  const MinOrUndefined = (a: number | undefined, b: number | undefined) => {
-    if (a === undefined) return b;
-    if (b === undefined) return a;
-    if (a === undefined && b === undefined) return undefined;
-    return Math.min(a, b);
   };
 
   const go = (node: SNode): SNode => {
@@ -128,8 +234,8 @@ export const extractConstraintsFromAST = (
       case "constraint":
         return visit(node);
       case "op":
-        const l = visit(node.left);
-        const r = visit(node.right);
+        const l = go(node.left);
+        const r = go(node.right);
         return visit({
           _: "op",
           op: node.op,
@@ -137,7 +243,7 @@ export const extractConstraintsFromAST = (
           right: r,
         });
       case "func":
-        const args = node.args.map(visit);
+        const args = node.args.map(go);
         return visit({ _: "func", name: node.name, args: args });
     }
   };

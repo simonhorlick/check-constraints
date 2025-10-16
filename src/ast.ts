@@ -1,14 +1,62 @@
 export type ConstraintDirective = {
-  // The minimum allowed length of the string.
+  /**
+   * The value of this constraint MUST be a non-negative integer. A string
+   * instance is valid against this constraint if its length is greater than,
+   * or equal to minLength. The length of a string instance is defined as the
+   * number of its characters.
+   */
   minLength?: number;
-  // The maximum allowed length of the string.
+
+  /**
+   * The value of this constraint MUST be a non-negative integer. A string
+   * instance is valid against this constraint if its length is less than, or
+   * equal to maxLength. The length of a string instance is defined as the
+   * number of its characters.
+   */
   maxLength?: number;
-  // The allowed length of the string must be greater than this value.
+
+  /**
+   * The value of exclusiveMin MUST be a number, representing an exclusive
+   * upper limit for a numeric instance. A numeric instance is valid only if it
+   * has a value strictly greater than (not equal to) exclusiveMin.
+   */
   exclusiveMin?: number;
-  // The allowed length of the string must be less than this value.
+
+  /**
+   * The value of exclusiveMax MUST be a number, representing an exclusive
+   * upper limit for a numeric instance. A numeric instance is valid only if it
+   * is strictly less than (not equal to) exclusiveMax.
+   */
   exclusiveMax?: number;
-  // Regex pattern that the string must match.
+
+  /**
+   * The value of this constraint MUST be a string. This string SHOULD be a
+   * valid regular expression, according to the ECMA 262 regular expression
+   * dialect. An instance is valid if the regular expression matches the
+   * instance successfully. Recall: regular expressions are not implicitly
+   * anchored.
+   */
   pattern?: string;
+
+  /**
+   * The value of max MUST be a number, representing an inclusive upper limit
+   * for a numeric instance. A numeric instance is valid only if the instance
+   * is less than or exactly equal to max.
+   */
+  max?: number;
+
+  /**
+   * The value of min MUST be a number, representing an inclusive lower limit
+   * for a numeric instance. A numeric instance is valid only if the instance
+   * is greater than or exactly equal to min.
+   */
+  min?: number;
+
+  /**
+   * A numeric instance is valid only if its value is equal to the value of the
+   * constraint.
+   */
+  equals?: number;
 };
 
 type ConstraintResultFailure = {
@@ -51,7 +99,7 @@ export type Ref = {
 
 export type BinOp = {
   _: "op";
-  op: "<" | ">" | "<=" | ">=" | "=" | "AND" | "OR" | "~*";
+  op: "<" | ">" | "<=" | ">=" | "=" | "AND" | "OR" | "~*" | "<>";
   left: SNode;
   right: SNode;
 };
