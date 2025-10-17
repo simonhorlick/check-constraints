@@ -412,4 +412,21 @@ describe("constraints", () => {
       },
     });
   });
+
+  it("should not extract startsWith if there are other wildcards in the string", () => {
+    const expr: SNode = {
+      _: "op",
+      op: "LIKE",
+      left: {
+        _: "ref",
+        name: "field",
+      },
+      right: {
+        _: "str",
+        value: "Ba_loon%",
+      },
+    };
+
+    expect(extractConstraintsFromAST(expr, "field").success).toEqual(false);
+  });
 });
