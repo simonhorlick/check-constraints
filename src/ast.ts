@@ -1,3 +1,5 @@
+import { Node } from "pgsql-parser";
+
 export type ConstraintDirective = {
   /**
    * The value of this constraint MUST be a non-negative integer. A string
@@ -107,9 +109,11 @@ export type Ref = {
   name: string; // name of the column
 };
 
+type BinOpType = "<" | ">" | "<=" | ">=" | "=" | "AND" | "OR" | "~*" | "<>";
+
 export type BinOp = {
   _: "op";
-  op: "<" | ">" | "<=" | ">=" | "=" | "AND" | "OR" | "~*" | "<>";
+  op: BinOpType;
   left: SNode;
   right: SNode;
 };
@@ -136,88 +140,113 @@ export type SNode =
   | ConstraintExpr
   | Arr;
 
+const strNameOrThrow = (name: Node[] | undefined): string => {
+  if (!name || name.length === 0) {
+    throw new Error("Expected a name but got none");
+  }
+  const first = name[0];
+  if ("String" in first) {
+    if (!first.String.sval) {
+      throw new Error("String node has no sval: " + JSON.stringify(first));
+    }
+    return first.String.sval;
+  } else {
+    throw new Error("Expected a String node but got " + JSON.stringify(first));
+  }
+};
+
 // toSNode converts a postgres AST node into a simplified tree structure that
 // is easier for us to work with.
-export const toSNode = (node: any): SNode => {
-  if (node.hasOwnProperty("A_Const")) {
-    if (node.A_Const.hasOwnProperty("ival")) {
+export const toSNode = (node: Node): SNode => {
+  if (node == null || typeof node !== "object") {
+    throw new Error("Invalid node: " + JSON.stringify(node));
+  }
+
+  // Each node is an object with a single key that indicates its type.
+  if ("A_Const" in node) {
+    const n = node["A_Const"];
+    if ("ival" in n) {
       return {
         _: "int",
-        value: node.A_Const.ival.ival ?? 0, // zero if missing
+        value: n.ival?.ival ?? 0, // zero if missing
       };
-    } else if (node.A_Const.hasOwnProperty("sval")) {
+    } else if ("sval" in n) {
       return {
         _: "str",
-        value: node.A_Const.sval.sval,
+        value: n.sval?.sval ?? "",
       };
     } else {
-      throw new Error(
-        "Unsupported constant type " + JSON.stringify(node.A_Const)
-      );
+      throw new Error("Unsupported constant type " + JSON.stringify(n));
     }
-  } else if (node.hasOwnProperty("TypeCast")) {
+  } else if ("TypeCast" in node) {
     const expr = node.TypeCast;
+    if (!expr.arg) {
+      throw new Error("TypeCast without arg not supported");
+    }
     // Do we need to do anything here?
     return toSNode(expr.arg);
-  } else if (node.hasOwnProperty("A_Expr")) {
+  } else if ("A_Expr" in node) {
     const expr = node.A_Expr;
-    if (expr.kind === "AEXPR_OP") {
-      return {
-        _: "op",
-        op: expr.name[0].String.sval,
-        left: toSNode(expr.lexpr),
-        right: toSNode(expr.rexpr),
-      };
-    } else if (expr.kind === "AEXPR_OP_ANY") {
-      // This expression is of the form `foo = ANY (...)`.
-      return {
-        _: "op",
-        op: expr.name[0].String.sval,
-        left: toSNode(expr.lexpr),
-        right: {
-          _: "func",
-          name: "ANY",
-          args: [toSNode(expr.rexpr)],
-        },
-      };
-    } else {
-      throw new Error("Unsupported A_Expr kind " + expr.kind);
+    switch (expr.kind) {
+      case "AEXPR_OP":
+        return {
+          _: "op",
+          op: strNameOrThrow(expr.name) as BinOpType,
+          left: toSNode(expr.lexpr!),
+          right: toSNode(expr.rexpr!),
+        };
+      case "AEXPR_OP_ANY":
+        // This expression is of the form `foo = ANY (...)`.
+        return {
+          _: "op",
+          op: strNameOrThrow(expr.name) as BinOpType,
+          left: toSNode(expr.lexpr!),
+          right: {
+            _: "func",
+            name: "ANY",
+            args: [toSNode(expr.rexpr!)],
+          },
+        };
+      default:
+        throw new Error("Unsupported A_Expr kind " + expr.kind);
     }
-  } else if (node.hasOwnProperty("BoolExpr")) {
+  } else if ("BoolExpr" in node) {
     const expr = node.BoolExpr;
-    const mapop = (op: string) => {
-      switch (op) {
-        case "AND_EXPR":
-          return "AND";
-        case "OR_EXPR":
-          return "OR";
-        default:
-          throw new Error("Unsupported BoolExpr op " + op);
-      }
-    };
-    return {
-      _: "op",
-      op: mapop(expr.boolop),
-      left: toSNode(expr.args[0]),
-      right: toSNode(expr.args[1]),
-    };
-  } else if (node.hasOwnProperty("FuncCall")) {
+    switch (expr.boolop!) {
+      case "AND_EXPR":
+        return {
+          _: "op",
+          op: "AND",
+          left: toSNode(expr.args![0]),
+          right: toSNode(expr.args![1]),
+        };
+      case "OR_EXPR":
+        return {
+          _: "op",
+          op: "OR",
+          left: toSNode(expr.args![0]),
+          right: toSNode(expr.args![1]),
+        };
+      case "NOT_EXPR":
+        throw new Error("NOT_EXPR is not supported");
+    }
+  } else if ("FuncCall" in node) {
     const func = node.FuncCall;
     return {
       _: "func",
-      name: func.funcname[0].String.sval,
-      args: func.args.map(toSNode),
+      name: strNameOrThrow(func.funcname),
+      args: func.args?.map(toSNode) ?? [],
     };
-  } else if (node.hasOwnProperty("ColumnRef")) {
+  } else if ("ColumnRef" in node) {
     return {
       _: "ref",
-      name: node.ColumnRef.fields[0].String.sval,
+      name: strNameOrThrow(node.ColumnRef.fields),
     };
-  } else if (node.hasOwnProperty("A_ArrayExpr")) {
+  } else if ("A_ArrayExpr" in node) {
     const arr = node.A_ArrayExpr;
     return {
       _: "arr",
-      elements: arr.elements.map(toSNode),
+      elements: arr.elements?.map(toSNode) ?? [],
     };
   } else {
     throw new Error("Unsupported node type: " + JSON.stringify(node));
