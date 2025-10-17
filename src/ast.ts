@@ -140,19 +140,25 @@ export type SNode =
   | ConstraintExpr
   | Arr;
 
+// strNameOrThrow extracts the string name from a Postgres AST name node. If
+// there are multiple parts to the name, they are joined with dots, for example
+// pg_catalog.extract.
 const strNameOrThrow = (name: Node[] | undefined): string => {
   if (!name || name.length === 0) {
     throw new Error("Expected a name but got none");
   }
-  const first = name[0];
-  if ("String" in first) {
-    if (!first.String.sval) {
-      throw new Error("String node has no sval: " + JSON.stringify(first));
-    }
-    return first.String.sval;
-  } else {
-    throw new Error("Expected a String node but got " + JSON.stringify(first));
-  }
+  return name
+    .map((n) => {
+      if ("String" in n) {
+        if (!n.String.sval) {
+          throw new Error("String node has no sval: " + JSON.stringify(n));
+        }
+        return n.String.sval;
+      } else {
+        throw new Error("Expected a String node but got " + JSON.stringify(n));
+      }
+    })
+    .join(".");
 };
 
 // toSNode converts a postgres AST node into a simplified tree structure that

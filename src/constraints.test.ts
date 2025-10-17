@@ -323,4 +323,27 @@ describe("constraints", () => {
       },
     });
   });
+
+  it("should not extract constraints: CHECK (word = reverse(word))", () => {
+    const expr: SNode = {
+      _: "op",
+      op: "=",
+      left: {
+        _: "ref",
+        name: "word",
+      },
+      right: {
+        _: "func",
+        name: "reverse", // Unsupported function
+        args: [
+          {
+            _: "ref",
+            name: "word",
+          },
+        ],
+      },
+    };
+
+    expect(extractConstraintsFromAST(expr, "word").success).toBe(false);
+  });
 });

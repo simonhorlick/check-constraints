@@ -482,4 +482,175 @@ describe("ast", () => {
       },
     });
   });
+
+  it("should extract the correct function name for functions with multiple parts", () => {
+    const ast: Node = {
+      BoolExpr: {
+        boolop: "AND_EXPR",
+        args: [
+          {
+            A_Expr: {
+              kind: "AEXPR_OP",
+              name: [
+                {
+                  String: {
+                    sval: "=",
+                  },
+                },
+              ],
+              lexpr: {
+                FuncCall: {
+                  funcname: [
+                    {
+                      String: {
+                        sval: "pg_catalog",
+                      },
+                    },
+                    {
+                      String: {
+                        sval: "extract",
+                      },
+                    },
+                  ],
+                  args: [
+                    {
+                      A_Const: {
+                        sval: {
+                          sval: "day",
+                        },
+                      },
+                    },
+                    {
+                      ColumnRef: {
+                        fields: [
+                          {
+                            String: {
+                              sval: "event_date",
+                            },
+                          },
+                        ],
+                      },
+                    },
+                  ],
+                  funcformat: "COERCE_SQL_SYNTAX",
+                },
+              },
+              rexpr: {
+                A_Const: {
+                  ival: {
+                    ival: 13,
+                  },
+                },
+              },
+            },
+          },
+          {
+            A_Expr: {
+              kind: "AEXPR_OP",
+              name: [
+                {
+                  String: {
+                    sval: "=",
+                  },
+                },
+              ],
+              lexpr: {
+                FuncCall: {
+                  funcname: [
+                    {
+                      String: {
+                        sval: "pg_catalog",
+                      },
+                    },
+                    {
+                      String: {
+                        sval: "extract",
+                      },
+                    },
+                  ],
+                  args: [
+                    {
+                      A_Const: {
+                        sval: {
+                          sval: "dow",
+                        },
+                      },
+                    },
+                    {
+                      ColumnRef: {
+                        fields: [
+                          {
+                            String: {
+                              sval: "event_date",
+                            },
+                          },
+                        ],
+                      },
+                    },
+                  ],
+                  funcformat: "COERCE_SQL_SYNTAX",
+                },
+              },
+              rexpr: {
+                A_Const: {
+                  ival: {
+                    ival: 5,
+                  },
+                },
+              },
+            },
+          },
+        ],
+      },
+    };
+    console.log(JSON.stringify(toSNode(ast), null, 2));
+    expect(toSNode(ast)).toEqual({
+      _: "op",
+      op: "AND",
+      left: {
+        _: "op",
+        op: "=",
+        left: {
+          _: "func",
+          name: "pg_catalog.extract",
+          args: [
+            {
+              _: "str",
+              value: "day",
+            },
+            {
+              _: "ref",
+              name: "event_date",
+            },
+          ],
+        },
+        right: {
+          _: "int",
+          value: 13,
+        },
+      },
+      right: {
+        _: "op",
+        op: "=",
+        left: {
+          _: "func",
+          name: "pg_catalog.extract",
+          args: [
+            {
+              _: "str",
+              value: "dow",
+            },
+            {
+              _: "ref",
+              name: "event_date",
+            },
+          ],
+        },
+        right: {
+          _: "int",
+          value: 5,
+        },
+      },
+    });
+  });
 });
