@@ -1,4 +1,4 @@
-import { ConstArgumentNode, Kind } from "graphql";
+import { ConstArgumentNode, GraphQLSchema, Kind } from "graphql";
 import { gatherConfig, GatherPluginContext } from "graphile-build";
 import type { PgConstraint } from "pg-introspection";
 import { withPgClientFromPgService } from "@dataplan/pg";
@@ -6,6 +6,8 @@ import { parseCheckConstraint } from "./parse";
 import { toSNode } from "./ast";
 import { extractConstraintsFromAST } from "./constraints";
 import { PgIntrospectionPlugin } from "graphile-build-pg";
+import { constraintDirective } from "./directive";
+import { processSchema } from "postgraphile/utils";
 
 interface State {
   checkConstraints: Set<PgConstraint & { body: string; parsed: any }>;
@@ -35,6 +37,16 @@ declare global {
     }
   }
 }
+
+export const ConstraintDirectiveTypeDefsPlugin = processSchema((schema) => {
+  // Append directive to schema
+  schema = new GraphQLSchema({
+    ...schema.toConfig(),
+    directives: [...schema.getDirectives(), constraintDirective],
+  });
+
+  return schema;
+});
 
 export const ConstraintDirectivePlugin: GraphileConfig.Plugin = {
   name: "ConstraintDirectivePlugin",

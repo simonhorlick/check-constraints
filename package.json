@@ -4,7 +4,7 @@
   "description": "",
   "license": "MIT",
   "author": "Simon Horlick <simonhorlick@gmail.com>",
-  "main": "index.js",
+  "main": "./dist/src/plugin.js",
   "scripts": {
     "build": "tsc",
     "prepack": "npm run build",
@@ -13,14 +13,18 @@
     "start": "node ./dist/src/index.js"
   },
   "dependencies": {
+    "@dataplan/pg": "^0.0.1-beta.39",
     "@pgsql/types": "^17.6.1",
+    "graphile-build": "^5.0.0-beta.39",
     "graphile-build-pg": "^5.0.0-beta.47",
-    "pgsql-parser": "^17.8.2",
-    "postgraphile": "^5.0.0-beta.49"
+    "pgsql-parser": "^17.8.2"
   },
   "devDependencies": {
     "@types/node": "^24.6.2",
     "typescript": "5.9.3",
     "vitest": "^3.2.4"
+  },
+  "peerDependencies": {
+    "postgraphile": "^5.0.0-beta.49"
   }
 }
