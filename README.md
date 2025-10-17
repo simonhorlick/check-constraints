@@ -50,3 +50,37 @@ export function UserInputSchema(): v.GenericSchema<UserInput> {
   })
 }
 ```
+
+## Installation
+
+```bash
+npm install --save check-constraints
+```
+
+```typescript
+import {
+  ConstraintDirectivePlugin,
+  ConstraintDirectiveTypeDefsPlugin,
+} from "check-constraints";
+
+const preset: GraphileConfig.Preset = {
+  // ...
+
+  plugins: [
+    ConstraintDirectivePlugin,
+    ConstraintDirectiveTypeDefsPlugin,
+  ],
+
+  // ...
+};
+```
+
+## Packaging
+
+```bash
+npm run build
+# Optionally test locally
+npm pack
+# Publish
+npm publish
+```
