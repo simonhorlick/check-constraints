@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { toSNode } from "./ast";
+import { Node } from "@pgsql/types";
 
 describe("ast", () => {
   it("should construct a simplified AST for CHECK (length(bio) < 10000)", () => {
-    const ast = {
+    const ast: Node = {
       A_Expr: {
         kind: "AEXPR_OP",
         name: [
@@ -69,7 +70,7 @@ describe("ast", () => {
   });
 
   it("should construct a simplified AST for CHECK (((email)::text ~* '^.+@.+..+$'::text))", () => {
-    const ast = {
+    const ast: Node = {
       A_Expr: {
         kind: "AEXPR_OP",
         name: [
@@ -143,7 +144,7 @@ describe("ast", () => {
   });
 
   it("should construct a simplified AST for CHECK ((((email)::text <> ''::text) AND (length((email)::text) < 100)))", () => {
-    const ast = {
+    const ast: Node = {
       BoolExpr: {
         boolop: "AND_EXPR",
         args: [
@@ -298,7 +299,7 @@ describe("ast", () => {
   });
 
   it("should construct a simplified AST for CHECK ((VALUE >= 0))", () => {
-    const ast = {
+    const ast: Node = {
       A_Expr: {
         kind: "AEXPR_OP",
         name: [
@@ -342,7 +343,7 @@ describe("ast", () => {
   });
 
   it("should construct a simplified AST for CHECK (((VALUE)::text = ANY ((ARRAY['YES'::character varying, 'NO'::character varying])::text[])))", () => {
-    const ast = {
+    const ast: Node = {
       A_Expr: {
         kind: "AEXPR_OP_ANY",
         name: [

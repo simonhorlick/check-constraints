@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseCheckConstraint } from "./parse";
+import { Node } from "@pgsql/types";
 
 describe("parse", () => {
   it("should parse CHECK ((VALUE >= 0))", async () => {
@@ -34,7 +35,7 @@ describe("parse", () => {
         },
         location: 45,
       },
-    });
+    } satisfies Node);
   });
 
   it("should parse CHECK (((VALUE)::text = ANY ((ARRAY['YES'::character varying, 'NO'::character varying])::text[])))", async () => {

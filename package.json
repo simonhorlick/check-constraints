@@ -12,6 +12,7 @@
     "start": "node ./dist/src/index.js"
   },
   "dependencies": {
+    "@pgsql/types": "^17.6.1",
     "pgsql-parser": "^17.8.2"
   },
   "devDependencies": {
