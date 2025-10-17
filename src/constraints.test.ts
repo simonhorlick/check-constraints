@@ -390,4 +390,26 @@ describe("constraints", () => {
       },
     });
   });
+
+  it("should extract equals from: field LIKE 's'", () => {
+    const expr: SNode = {
+      _: "op",
+      op: "LIKE",
+      left: {
+        _: "ref",
+        name: "field",
+      },
+      right: {
+        _: "str",
+        value: "s",
+      },
+    };
+
+    expect(extractConstraintsFromAST(expr, "field")).toEqual({
+      success: true,
+      constraints: {
+        equals: "s",
+      },
+    });
+  });
 });

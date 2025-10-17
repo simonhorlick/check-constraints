@@ -241,13 +241,35 @@ export const extractConstraintsFromAST = (
       };
     }
 
-    // Transform LIKE 'X%' expressions into startsWith constraints.
+    // Transform LIKE 'X' expressions into equals constraints. As per the
+    // documentation strings with no wildcards behave like equals.
     if (
       n._ === "op" &&
       n.op === "LIKE" &&
       n.left._ === "ref" &&
       n.left.name === columnName &&
       n.right._ === "str" &&
+      !n.right.value.includes("%") &&
+      !n.right.value.includes("_")
+    ) {
+      return {
+        _: "constraint",
+        constraints: {
+          equals: n.right.value,
+        },
+      };
+    }
+
+    // Transform LIKE 'X%' expressions into startsWith constraints. Note that
+    // this is only valid when there are no other wildcards ('%', '_') in the
+    // string.
+    if (
+      n._ === "op" &&
+      n.op === "LIKE" &&
+      n.left._ === "ref" &&
+      n.left.name === columnName &&
+      n.right._ === "str" &&
+      !n.right.value.includes("_") &&
       n.right.value.endsWith("%") &&
       !n.right.value.slice(0, -1).includes("%")
     ) {
@@ -259,13 +281,14 @@ export const extractConstraintsFromAST = (
       };
     }
 
-    // Transform LIKE '%X' expressions into endsWith constraints.
+    // Transform LIKE '%X' expressions into endsWith constraints. See above.
     if (
       n._ === "op" &&
       n.op === "LIKE" &&
       n.left._ === "ref" &&
       n.left.name === columnName &&
       n.right._ === "str" &&
+      !n.right.value.includes("_") &&
       n.right.value.startsWith("%") &&
       !n.right.value.slice(1).includes("%")
     ) {

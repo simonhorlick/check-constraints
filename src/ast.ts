@@ -55,10 +55,10 @@ export type ConstraintDirective = {
   min?: number;
 
   /**
-   * A numeric instance is valid only if its value is equal to the value of the
+   * A value is valid only if its value is equal to the value of the
    * constraint.
    */
-  equals?: number;
+  equals?: number | string;
 
   /**
    * A value is valid if it is equal to one of the values in this array.
