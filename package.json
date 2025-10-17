@@ -6,14 +6,17 @@
   "author": "Simon Horlick <simonhorlick@gmail.com>",
   "main": "index.js",
   "scripts": {
-    "compile": "tsc",
-    "prestart": "npm run compile",
+    "build": "tsc",
+    "prepack": "npm run build",
+    "prestart": "npm run build",
     "test": "vitest",
     "start": "node ./dist/src/index.js"
   },
   "dependencies": {
     "@pgsql/types": "^17.6.1",
-    "pgsql-parser": "^17.8.2"
+    "graphile-build-pg": "^5.0.0-beta.47",
+    "pgsql-parser": "^17.8.2",
+    "postgraphile": "^5.0.0-beta.49"
   },
   "devDependencies": {
     "@types/node": "^24.6.2",
