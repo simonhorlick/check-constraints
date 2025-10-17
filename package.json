@@ -1,10 +1,15 @@
 {
   "name": "check-constraints",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "",
   "license": "MIT",
   "author": "Simon Horlick <simonhorlick@gmail.com>",
   "main": "./dist/src/plugin.js",
+  "files": [
+    "dist/",
+    "src/",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc",
     "prepack": "npm run build",
@@ -22,9 +27,11 @@
   "devDependencies": {
     "@types/node": "^24.6.2",
     "typescript": "5.9.3",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "graphql": "^16.11.0"
   },
   "peerDependencies": {
-    "postgraphile": "^5.0.0-beta.49"
+    "postgraphile": "^5.0.0-beta.49",
+    "graphql": "^16.11.0"
   }
 }
