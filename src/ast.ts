@@ -109,7 +109,17 @@ export type Ref = {
   name: string; // name of the column
 };
 
-type BinOpType = "<" | ">" | "<=" | ">=" | "=" | "AND" | "OR" | "~*" | "<>";
+type BinOpType =
+  | "<"
+  | ">"
+  | "<="
+  | ">="
+  | "="
+  | "AND"
+  | "OR"
+  | "~*"
+  | "<>"
+  | "LIKE";
 
 export type BinOp = {
   _: "op";
@@ -212,6 +222,13 @@ export const toSNode = (node: Node): SNode => {
             name: "ANY",
             args: [toSNode(expr.rexpr!)],
           },
+        };
+      case "AEXPR_LIKE":
+        return {
+          _: "op",
+          op: "LIKE",
+          left: toSNode(expr.lexpr!),
+          right: toSNode(expr.rexpr!),
         };
       default:
         throw new Error("Unsupported A_Expr kind " + expr.kind);

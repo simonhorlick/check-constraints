@@ -653,4 +653,49 @@ describe("ast", () => {
       },
     });
   });
+
+  it("should extract LIKE constraints", async () => {
+    const ast: Node = {
+      A_Expr: {
+        kind: "AEXPR_LIKE",
+        name: [
+          {
+            String: {
+              sval: "~~", // Postgres internal representation for LIKE
+            },
+          },
+        ],
+        lexpr: {
+          ColumnRef: {
+            fields: [
+              {
+                String: {
+                  sval: "number",
+                },
+              },
+            ],
+          },
+        },
+        rexpr: {
+          A_Const: {
+            sval: {
+              sval: "+1%",
+            },
+          },
+        },
+      },
+    };
+    expect(toSNode(ast)).toEqual({
+      _: "op",
+      op: "LIKE",
+      left: {
+        _: "ref",
+        name: "number",
+      },
+      right: {
+        _: "str",
+        value: "+1%",
+      },
+    });
+  });
 });
