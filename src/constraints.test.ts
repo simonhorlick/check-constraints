@@ -346,4 +346,48 @@ describe("constraints", () => {
 
     expect(extractConstraintsFromAST(expr, "word").success).toBe(false);
   });
+
+  it("should extract startsWith from: number LIKE '+1%'", () => {
+    const expr: SNode = {
+      _: "op",
+      op: "LIKE",
+      left: {
+        _: "ref",
+        name: "number",
+      },
+      right: {
+        _: "str",
+        value: "+1%",
+      },
+    };
+
+    expect(extractConstraintsFromAST(expr, "number")).toEqual({
+      success: true,
+      constraints: {
+        startsWith: "+1",
+      },
+    });
+  });
+
+  it("should extract endsWith from: plurals LIKE '%s'", () => {
+    const expr: SNode = {
+      _: "op",
+      op: "LIKE",
+      left: {
+        _: "ref",
+        name: "plurals",
+      },
+      right: {
+        _: "str",
+        value: "%s",
+      },
+    };
+
+    expect(extractConstraintsFromAST(expr, "plurals")).toEqual({
+      success: true,
+      constraints: {
+        endsWith: "s",
+      },
+    });
+  });
 });

@@ -241,6 +241,42 @@ export const extractConstraintsFromAST = (
       };
     }
 
+    // Transform LIKE 'X%' expressions into startsWith constraints.
+    if (
+      n._ === "op" &&
+      n.op === "LIKE" &&
+      n.left._ === "ref" &&
+      n.left.name === columnName &&
+      n.right._ === "str" &&
+      n.right.value.endsWith("%") &&
+      !n.right.value.slice(0, -1).includes("%")
+    ) {
+      return {
+        _: "constraint",
+        constraints: {
+          startsWith: n.right.value.slice(0, -1),
+        },
+      };
+    }
+
+    // Transform LIKE '%X' expressions into endsWith constraints.
+    if (
+      n._ === "op" &&
+      n.op === "LIKE" &&
+      n.left._ === "ref" &&
+      n.left.name === columnName &&
+      n.right._ === "str" &&
+      n.right.value.startsWith("%") &&
+      !n.right.value.slice(1).includes("%")
+    ) {
+      return {
+        _: "constraint",
+        constraints: {
+          endsWith: n.right.value.slice(1),
+        },
+      };
+    }
+
     return n;
   };
 

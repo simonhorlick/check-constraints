@@ -64,6 +64,18 @@ export type ConstraintDirective = {
    * A value is valid if it is equal to one of the values in this array.
    */
   oneOf?: string[];
+
+  /**
+   * The value of this constraint MUST be a string. An instance is valid if it
+   * begins with the characters of the constraint's string.
+   */
+  startsWith?: string;
+
+  /**
+   * The value of this constraint MUST be a string. An instance is valid if it
+   * ends with the characters of the constraint's string.
+   */
+  endsWith?: string;
 };
 
 type ConstraintResultFailure = {
