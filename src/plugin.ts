@@ -38,15 +38,25 @@ declare global {
   }
 }
 
-export const ConstraintDirectiveTypeDefsPlugin = processSchema((schema) => {
-  // Append directive to schema
-  schema = new GraphQLSchema({
-    ...schema.toConfig(),
-    directives: [...schema.getDirectives(), constraintDirective],
-  });
+export const ConstraintDirectiveTypeDefsPlugin: GraphileConfig.Plugin = {
+  name: `ConstraintDirectiveTypeDefsPlugin`,
+  version: "0.0.0",
+  schema: {
+    hooks: {
+      finalize: {
+        callback: (schema) => {
+          // Append directive to schema
+          schema = new GraphQLSchema({
+            ...schema.toConfig(),
+            directives: [...schema.getDirectives(), constraintDirective],
+          });
 
-  return schema;
-});
+          return schema;
+        },
+      },
+    },
+  },
+};
 
 export const ConstraintDirectivePlugin: GraphileConfig.Plugin = {
   name: "ConstraintDirectivePlugin",
