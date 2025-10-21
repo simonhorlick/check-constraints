@@ -13,12 +13,20 @@ import { withPgClientFromPgService } from "@dataplan/pg";
 import { parseCheckConstraint } from "./parse";
 import { toSNode } from "./ast";
 import { extractConstraintsFromAST } from "./constraints";
-import { PgIntrospectionPlugin } from "graphile-build-pg";
+import "graphile-build-pg";
 import { constraintDirective } from "./directive";
-import { processSchema } from "postgraphile/utils";
 
 interface State {
   checkConstraints: Set<PgConstraint & { body: string; parsed: any }>;
+}
+
+export interface ConstraintDirectivePluginOptions {
+  /**
+   * Whether to include the constraint directive in the field description.
+   * This makes constraints visible in GraphiQL and other GraphQL explorers.
+   * @default false
+   */
+  printConstraintInDescription?: boolean;
 }
 
 declare global {
@@ -66,283 +74,296 @@ export const ConstraintDirectiveTypeDefsPlugin: GraphileConfig.Plugin = {
   },
 };
 
-export const ConstraintDirectivePlugin: GraphileConfig.Plugin = {
-  name: "ConstraintDirectivePlugin",
-  description: "Adds `@constraint` directives to input fields.",
-  version: "0.0.1",
-  after: ["PgIntrospectionPlugin"],
+export const makeConstraintDirectivePlugin = (
+  options: ConstraintDirectivePluginOptions = {}
+): GraphileConfig.Plugin => {
+  const { printConstraintInDescription = false } = options;
 
-  gather: gatherConfig({
-    namespace: "constraintDirectivePlugin",
+  return {
+    name: "ConstraintDirectivePlugin",
+    description: "Adds `@constraint` directives to input fields.",
+    version: "0.0.1",
+    after: ["PgIntrospectionPlugin"],
 
-    initialState: (): State => ({
-      checkConstraints: new Set(),
-    }),
+    gather: gatherConfig({
+      namespace: "constraintDirectivePlugin",
 
-    helpers: {
-      getCheckConstraints(
-        info
-      ): Set<PgConstraint & { body: string; parsed: any }> {
-        return info.state.checkConstraints;
-      },
-      async fetchConstraintBodies(
-        info
-      ): Promise<
-        Array<{ oid: string; def: string; parsed: any; pgServiceName: string }>
-      > {
-        const pgServices = info.resolvedPreset.pgServices as any;
-        if (!pgServices) {
-          return [];
-        }
+      initialState: (): State => ({
+        checkConstraints: new Set(),
+      }),
 
-        const all = await Promise.all(
-          pgServices.map(async (pgService: any) => {
-            // Fetch the bodies of all CHECK constraints in this database.
-            const result = await withPgClientFromPgService(
-              pgService,
-              pgService.pgSettingsForIntrospection ?? null,
-              (client) =>
-                client.query<{ oid: string; def: string }>({
-                  text: `SELECT oid::TEXT, pg_get_constraintdef(oid) AS def FROM pg_constraint WHERE contype = 'c'`,
+      helpers: {
+        getCheckConstraints(
+          info
+        ): Set<PgConstraint & { body: string; parsed: any }> {
+          return info.state.checkConstraints;
+        },
+        async fetchConstraintBodies(info): Promise<
+          Array<{
+            oid: string;
+            def: string;
+            parsed: any;
+            pgServiceName: string;
+          }>
+        > {
+          const pgServices = info.resolvedPreset.pgServices as any;
+          if (!pgServices) {
+            return [];
+          }
+
+          const all = await Promise.all(
+            pgServices.map(async (pgService: any) => {
+              // Fetch the bodies of all CHECK constraints in this database.
+              const result = await withPgClientFromPgService(
+                pgService,
+                pgService.pgSettingsForIntrospection ?? null,
+                (client) =>
+                  client.query<{ oid: string; def: string }>({
+                    text: `SELECT oid::TEXT, pg_get_constraintdef(oid) AS def FROM pg_constraint WHERE contype = 'c'`,
+                  })
+              );
+
+              return await Promise.all(
+                result.rows.map(async (row) => {
+                  // Parse the constraint into an AST.
+                  const parsed = await parseCheckConstraint(row.def);
+
+                  return {
+                    ...row,
+                    // Add service name
+                    pgServiceName: pgService.name,
+                    // Add parsed body
+                    parsed: parsed,
+                  };
                 })
-            );
-
-            return await Promise.all(
-              result.rows.map(async (row) => {
-                // Parse the constraint into an AST.
-                const parsed = await parseCheckConstraint(row.def);
-
-                return {
-                  ...row,
-                  // Add service name
-                  pgServiceName: pgService.name,
-                  // Add parsed body
-                  parsed: parsed,
-                };
-              })
-            );
-          })
-        );
-
-        return all.flat();
-      },
-    },
-
-    async main(output, info) {
-      // Pass the constraints to the build input.
-      output.checkConstraints =
-        info.helpers.constraintDirectivePlugin.getCheckConstraints(info);
-    },
-
-    hooks: {
-      async pgIntrospection_introspection(info, event) {
-        // Fetch the bodies of all check constraints in the database.
-        const constraintBodies =
-          await info.helpers.constraintDirectivePlugin.fetchConstraintBodies(
-            info
+              );
+            })
           );
 
-        const checkConstraints = event.introspection.constraints.filter(
-          (c) => c.contype === "c"
-        );
-
-        // Augment each constraint with its parsed body.
-        info.state.checkConstraints = new Set(
-          checkConstraints.map((c) => {
-            const def = constraintBodies.find((cb) => cb.oid === c._id);
-
-            return {
-              ...c,
-              body: def?.def || "",
-              parsed: def?.parsed || null,
-            };
-          })
-        );
-
-        // Attach ids to each column so we can look them up later.
-        event.introspection.attributes.forEach((attr) => {
-          const smartTags = attr.getTags();
-          smartTags.attrelid = attr.attrelid;
-          smartTags.attnum = attr.attnum.toString();
-        });
+          return all.flat();
+        },
       },
-    },
-  }),
 
-  schema: {
-    hooks: {
-      GraphQLInputObjectType_fields_field(field, build, context) {
-        const {
-          scope: { fieldName, pgAttribute },
-          Self,
-        } = context;
+      async main(output, info) {
+        // Pass the constraints to the build input.
+        output.checkConstraints =
+          info.helpers.constraintDirectivePlugin.getCheckConstraints(info);
+      },
 
-        // Skip anything that isn't an input object for a mutation (i.e.
-        // conditions, orderings, etc).
-        if (context.scope.isPgConnectionConditionInputField) {
-          return field;
-        }
+      hooks: {
+        async pgIntrospection_introspection(info, event) {
+          // Fetch the bodies of all check constraints in the database.
+          const constraintBodies =
+            await info.helpers.constraintDirectivePlugin.fetchConstraintBodies(
+              info
+            );
 
-        const checkConstraints = build.input.checkConstraints;
+          const checkConstraints = event.introspection.constraints.filter(
+            (c) => c.contype === "c"
+          );
 
-        // Figure out the set of constraints that apply to this field.
+          // Augment each constraint with its parsed body.
+          info.state.checkConstraints = new Set(
+            checkConstraints.map((c) => {
+              const def = constraintBodies.find((cb) => cb.oid === c._id);
 
-        // The number of the column. Ordinary columns are numbered from 1 up.
-        const attnumstr = pgAttribute?.extensions?.tags?.attnum as string;
-        // The table this column belongs to.
-        const attrelid = pgAttribute?.extensions?.tags?.attrelid;
-        if (!attnumstr || !attrelid) {
-          return field;
-        }
-        const attnum = parseInt(attnumstr);
+              return {
+                ...c,
+                body: def?.def || "",
+                parsed: def?.parsed || null,
+              };
+            })
+          );
 
-        const fieldConstraints = Array.from(checkConstraints).filter(
-          (c) =>
-            c.conrelid === attrelid /* table matches */ &&
-            c.conkey?.includes(attnum) /* column is involved */
-        );
+          // Attach ids to each column so we can look them up later.
+          event.introspection.attributes.forEach((attr) => {
+            const smartTags = attr.getTags();
+            smartTags.attrelid = attr.attrelid;
+            smartTags.attnum = attr.attnum.toString();
+          });
+        },
+      },
+    }),
 
-        const constraints = fieldConstraints
-          .map((con) => {
-            const ast = toSNode(con.parsed);
-            return extractConstraintsFromAST(ast, fieldName);
-          })
-          .map((con) => (con.success ? con.constraints : null))
-          .filter((con) => con !== null)
-          .flat();
+    schema: {
+      hooks: {
+        GraphQLInputObjectType_fields_field(field, build, context) {
+          const {
+            scope: { fieldName, pgAttribute },
+            Self,
+          } = context;
 
-        const args: ConstArgumentNode[] = [];
-        for (const constraint of constraints) {
-          if (constraint.equals !== undefined) {
-            args.push({
-              kind: Kind.ARGUMENT,
-              name: { kind: Kind.NAME, value: "equals" },
-              value: {
-                kind: Kind.INT,
-                value: constraint.equals.toString(),
-              },
-            });
+          // Skip anything that isn't an input object for a mutation (i.e.
+          // conditions, orderings, etc).
+          if (context.scope.isPgConnectionConditionInputField) {
+            return field;
           }
-          if (constraint.min !== undefined) {
-            args.push({
-              kind: Kind.ARGUMENT,
-              name: { kind: Kind.NAME, value: "min" },
-              value: {
-                kind: Kind.INT,
-                value: constraint.min.toString(),
-              },
-            });
-          }
-          if (constraint.max !== undefined) {
-            args.push({
-              kind: Kind.ARGUMENT,
-              name: { kind: Kind.NAME, value: "max" },
-              value: {
-                kind: Kind.INT,
-                value: constraint.max.toString(),
-              },
-            });
-          }
-          if (constraint.minLength !== undefined) {
-            args.push({
-              kind: Kind.ARGUMENT,
-              name: { kind: Kind.NAME, value: "minLength" },
-              value: {
-                kind: Kind.INT,
-                value: constraint.minLength.toString(),
-              },
-            });
-          }
-          if (constraint.maxLength !== undefined) {
-            args.push({
-              kind: Kind.ARGUMENT,
-              name: { kind: Kind.NAME, value: "maxLength" },
-              value: {
-                kind: Kind.INT,
-                value: constraint.maxLength.toString(),
-              },
-            });
-          }
-          if (constraint.exclusiveMin !== undefined) {
-            args.push({
-              kind: Kind.ARGUMENT,
-              name: { kind: Kind.NAME, value: "exclusiveMin" },
-              value: {
-                kind: Kind.INT,
-                value: constraint.exclusiveMin.toString(),
-              },
-            });
-          }
-          if (constraint.exclusiveMax !== undefined) {
-            args.push({
-              kind: Kind.ARGUMENT,
-              name: { kind: Kind.NAME, value: "exclusiveMax" },
-              value: {
-                kind: Kind.INT,
-                value: constraint.exclusiveMax.toString(),
-              },
-            });
-          }
-          if (constraint.oneOf !== undefined) {
-            args.push({
-              kind: Kind.ARGUMENT,
-              name: { kind: Kind.NAME, value: "oneOf" },
-              value: {
-                kind: Kind.INT,
-                value: constraint.oneOf.toString(),
-              },
-            });
-          }
-          if (constraint.pattern !== undefined) {
-            args.push({
-              kind: Kind.ARGUMENT,
-              name: { kind: Kind.NAME, value: "pattern" },
-              value: {
-                kind: Kind.STRING,
-                value: constraint.pattern,
-              },
-            });
-          }
-        }
 
-        if (args.length === 0) {
-          return field;
-        }
+          const checkConstraints = build.input.checkConstraints;
 
-        const constraintDirective: ConstDirectiveNode = {
-          kind: Kind.DIRECTIVE,
-          name: { kind: Kind.NAME, value: "constraint" },
-          arguments: args,
-        };
+          // Figure out the set of constraints that apply to this field.
 
-        const newAstNode: InputValueDefinitionNode = {
-          kind: Kind.INPUT_VALUE_DEFINITION,
-          name: { kind: Kind.NAME, value: fieldName },
-          type: {
-            kind: Kind.NAMED_TYPE,
-            name: {
-              kind: Kind.NAME,
-              value: (field.type as any).name,
+          // The number of the column. Ordinary columns are numbered from 1 up.
+          const attnumstr = pgAttribute?.extensions?.tags?.attnum as string;
+          // The table this column belongs to.
+          const attrelid = pgAttribute?.extensions?.tags?.attrelid;
+          if (!attnumstr || !attrelid) {
+            return field;
+          }
+          const attnum = parseInt(attnumstr);
+
+          const fieldConstraints = Array.from(checkConstraints).filter(
+            (c) =>
+              c.conrelid === attrelid /* table matches */ &&
+              c.conkey?.includes(attnum) /* column is involved */
+          );
+
+          const constraints = fieldConstraints
+            .map((con) => {
+              const ast = toSNode(con.parsed);
+              return extractConstraintsFromAST(ast, fieldName);
+            })
+            .map((con) => (con.success ? con.constraints : null))
+            .filter((con) => con !== null)
+            .flat();
+
+          const args: ConstArgumentNode[] = [];
+          for (const constraint of constraints) {
+            if (constraint.equals !== undefined) {
+              args.push({
+                kind: Kind.ARGUMENT,
+                name: { kind: Kind.NAME, value: "equals" },
+                value: {
+                  kind: Kind.INT,
+                  value: constraint.equals.toString(),
+                },
+              });
+            }
+            if (constraint.min !== undefined) {
+              args.push({
+                kind: Kind.ARGUMENT,
+                name: { kind: Kind.NAME, value: "min" },
+                value: {
+                  kind: Kind.INT,
+                  value: constraint.min.toString(),
+                },
+              });
+            }
+            if (constraint.max !== undefined) {
+              args.push({
+                kind: Kind.ARGUMENT,
+                name: { kind: Kind.NAME, value: "max" },
+                value: {
+                  kind: Kind.INT,
+                  value: constraint.max.toString(),
+                },
+              });
+            }
+            if (constraint.minLength !== undefined) {
+              args.push({
+                kind: Kind.ARGUMENT,
+                name: { kind: Kind.NAME, value: "minLength" },
+                value: {
+                  kind: Kind.INT,
+                  value: constraint.minLength.toString(),
+                },
+              });
+            }
+            if (constraint.maxLength !== undefined) {
+              args.push({
+                kind: Kind.ARGUMENT,
+                name: { kind: Kind.NAME, value: "maxLength" },
+                value: {
+                  kind: Kind.INT,
+                  value: constraint.maxLength.toString(),
+                },
+              });
+            }
+            if (constraint.exclusiveMin !== undefined) {
+              args.push({
+                kind: Kind.ARGUMENT,
+                name: { kind: Kind.NAME, value: "exclusiveMin" },
+                value: {
+                  kind: Kind.INT,
+                  value: constraint.exclusiveMin.toString(),
+                },
+              });
+            }
+            if (constraint.exclusiveMax !== undefined) {
+              args.push({
+                kind: Kind.ARGUMENT,
+                name: { kind: Kind.NAME, value: "exclusiveMax" },
+                value: {
+                  kind: Kind.INT,
+                  value: constraint.exclusiveMax.toString(),
+                },
+              });
+            }
+            if (constraint.oneOf !== undefined) {
+              args.push({
+                kind: Kind.ARGUMENT,
+                name: { kind: Kind.NAME, value: "oneOf" },
+                value: {
+                  kind: Kind.INT,
+                  value: constraint.oneOf.toString(),
+                },
+              });
+            }
+            if (constraint.pattern !== undefined) {
+              args.push({
+                kind: Kind.ARGUMENT,
+                name: { kind: Kind.NAME, value: "pattern" },
+                value: {
+                  kind: Kind.STRING,
+                  value: constraint.pattern,
+                },
+              });
+            }
+          }
+
+          if (args.length === 0) {
+            return field;
+          }
+
+          const constraintDirective: ConstDirectiveNode = {
+            kind: Kind.DIRECTIVE,
+            name: { kind: Kind.NAME, value: "constraint" },
+            arguments: args,
+          };
+
+          const newAstNode: InputValueDefinitionNode = {
+            kind: Kind.INPUT_VALUE_DEFINITION,
+            name: { kind: Kind.NAME, value: fieldName },
+            type: {
+              kind: Kind.NAMED_TYPE,
+              name: {
+                kind: Kind.NAME,
+                value: (field.type as any).name,
+              },
             },
-          },
 
-          // Add the directive.
-          ...(field.astNode || {}),
-          directives: [
-            ...(field.astNode?.directives || []),
-            constraintDirective,
-          ],
-        };
+            // Add the directive.
+            ...(field.astNode || {}),
+            directives: [
+              ...(field.astNode?.directives || []),
+              constraintDirective,
+            ],
+          };
 
-        // Append to the description as currently there's no other way to
-        // see the directive in GraphiQL (see GraphQL spec issue #300)
-        field.description =
-          field.description + `\n\n` + print(constraintDirective);
+          if (printConstraintInDescription) {
+            // Append to the description as currently there's no other way to
+            // see the directive in GraphiQL (see GraphQL spec issue #300)
+            field.description =
+              field.description + `\n\n` + print(constraintDirective);
+          }
 
-        field.astNode = newAstNode;
+          field.astNode = newAstNode;
 
-        return field;
+          return field;
+        },
       },
     },
-  },
+  };
 };
+
+export const ConstraintDirectivePlugin = makeConstraintDirectivePlugin();
