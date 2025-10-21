@@ -1,4 +1,12 @@
-import { ConstArgumentNode, GraphQLSchema, Kind } from "graphql";
+import {
+  ConstArgumentNode,
+  type ConstDirectiveNode,
+  graphql,
+  GraphQLSchema,
+  type InputValueDefinitionNode,
+  Kind,
+  print,
+} from "graphql";
 import { gatherConfig, GatherPluginContext } from "graphile-build";
 import type { PgConstraint } from "pg-introspection";
 import { withPgClientFromPgService } from "@dataplan/pg";
@@ -301,34 +309,39 @@ export const ConstraintDirectivePlugin: GraphileConfig.Plugin = {
           return field;
         }
 
-        return build.extend(
-          field,
-          {
-            // Add the directive.
-            astNode: {
-              kind: Kind.INPUT_VALUE_DEFINITION,
-              name: { kind: Kind.NAME, value: fieldName },
-              type: {
-                kind: Kind.NAMED_TYPE,
-                name: {
-                  kind: Kind.NAME,
-                  value: (field.type as any).name,
-                },
-              },
+        const constraintDirective: ConstDirectiveNode = {
+          kind: Kind.DIRECTIVE,
+          name: { kind: Kind.NAME, value: "constraint" },
+          arguments: args,
+        };
 
-              ...(field.astNode || {}),
-              directives: [
-                ...(field.astNode?.directives || []),
-                {
-                  kind: Kind.DIRECTIVE,
-                  name: { kind: Kind.NAME, value: "constraint" },
-                  arguments: args,
-                },
-              ],
+        const newAstNode: InputValueDefinitionNode = {
+          kind: Kind.INPUT_VALUE_DEFINITION,
+          name: { kind: Kind.NAME, value: fieldName },
+          type: {
+            kind: Kind.NAMED_TYPE,
+            name: {
+              kind: Kind.NAME,
+              value: (field.type as any).name,
             },
           },
-          `Adding @constraint to '${fieldName}' field in '${Self.name}'`
-        );
+
+          // Add the directive.
+          ...(field.astNode || {}),
+          directives: [
+            ...(field.astNode?.directives || []),
+            constraintDirective,
+          ],
+        };
+
+        // Append to the description as currently there's no other way to
+        // see the directive in GraphiQL (see GraphQL spec issue #300)
+        field.description =
+          field.description + `\n\n` + print(constraintDirective);
+
+        field.astNode = newAstNode;
+
+        return field;
       },
     },
   },
