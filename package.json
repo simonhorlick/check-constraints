@@ -4,6 +4,10 @@
   "description": "",
   "license": "MIT",
   "author": "Simon Horlick <simonhorlick@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/simonhorlick/check-constraints.git"
+  },
   "main": "./dist/src/plugin.js",
   "files": [
     "dist/",
