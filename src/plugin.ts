@@ -220,8 +220,17 @@ export const makeConstraintDirectivePlugin = (
 
           const constraints = fieldConstraints
             .map((con) => {
-              const ast = toSNode(con.parsed);
-              return extractConstraintsFromAST(ast, fieldName);
+              try {
+                const ast = toSNode(con.parsed);
+                return extractConstraintsFromAST(ast, fieldName);
+              } catch (e) {
+                if (e instanceof Error) {
+                  console.warn(
+                    `Failed to extract constraints from CHECK constraint AST for constraint ${con.conname} on attribute ${fieldName}: ${e.message}`
+                  );
+                }
+                return { success: false, constraints: [] };
+              }
             })
             .map((con) => (con.success ? con.constraints : null))
             .filter((con) => con !== null)
