@@ -59,6 +59,30 @@ npm install --save check-constraints
 
 ```typescript
 import {
+  makeConstraintDirectivePlugin,
+  ConstraintDirectiveTypeDefsPlugin,
+} from "check-constraints";
+
+const preset: GraphileConfig.Preset = {
+  // ...
+
+  plugins: [
+    makeConstraintDirectivePlugin({
+      // Optional: include constraint directives in field descriptions
+      // This makes constraints visible in GraphiQL and other GraphQL explorers
+      printConstraintInDescription: false, // default
+    }),
+    ConstraintDirectiveTypeDefsPlugin,
+  ],
+
+  // ...
+};
+```
+
+Or use the default configuration:
+
+```typescript
+import {
   ConstraintDirectivePlugin,
   ConstraintDirectiveTypeDefsPlugin,
 } from "check-constraints";
@@ -67,7 +91,7 @@ const preset: GraphileConfig.Preset = {
   // ...
 
   plugins: [
-    ConstraintDirectivePlugin,
+    ConstraintDirectivePlugin, // Same as makeConstraintDirectivePlugin()
     ConstraintDirectiveTypeDefsPlugin,
   ],
 

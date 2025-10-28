@@ -1,9 +1,13 @@
 {
   "name": "check-constraints",
-  "version": "1.0.2",
-  "description": "",
+  "version": "1.2.1",
+  "description": "A plugin for postgraphile to pull CHECK constraints from the database and expose them as directives on the GraphQL input objects.",
   "license": "MIT",
   "author": "Simon Horlick <simonhorlick@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/simonhorlick/check-constraints.git"
+  },
   "main": "./dist/src/plugin.js",
   "files": [
     "dist/",
@@ -26,12 +30,12 @@
   },
   "devDependencies": {
     "@types/node": "^24.6.2",
+    "graphql": "^16.11.0",
     "typescript": "5.9.3",
-    "vitest": "^3.2.4",
-    "graphql": "^16.11.0"
+    "vitest": "^3.2.4"
   },
   "peerDependencies": {
-    "postgraphile": "^5.0.0-beta.49",
-    "graphql": "^16.11.0"
+    "graphql": "^16.11.0",
+    "postgraphile": "^5.0.0-beta.49"
   }
 }
