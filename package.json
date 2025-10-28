@@ -1,7 +1,7 @@
 {
   "name": "check-constraints",
-  "version": "1.2.0",
-  "description": "",
+  "version": "1.2.1",
+  "description": "A plugin for postgraphile to pull CHECK constraints from the database and expose them as directives on the GraphQL input objects.",
   "license": "MIT",
   "author": "Simon Horlick <simonhorlick@gmail.com>",
   "repository": {
